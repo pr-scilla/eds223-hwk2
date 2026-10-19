@@ -101,3 +101,36 @@ if((st_crs(redline) == st_crs(crash_clean_coords)) & (st_crs(los_angeles) == st_
 }else{
   warning('CRS do not match')}
 ```
+
+## Part 1: Legacy of redlining in current environmental (in)justice
+
+Map of historical redlining neighborhoods in Los Angeles:
+```{r}
+redline_neighborhoods <- tm_shape(los_angeles, bbox = c(-119, 33.65, -117.6, 34.32)) + # Add bounding box to restrict to portion of Los Angeles county with redlining data
+  tm_graticules() +
+  tm_polygons(fill = "cornsilk", col = "burlywood4", lwd = 0.5, col_alpha = 0.6) + 
+  tm_shape(redline) + # Add historical redlining data
+  tm_polygons(fill = "grade", lwd = 0.5,
+              fill.scale = tm_scale_categorical(
+                  values = c('green3', 'yellow1', 'orange1', 'red2')),
+              fill.legend = tm_legend(title = "HOLC Grade",
+                                      position = tm_pos_out('right'))) +
+  tm_compass(position = c('left', 'bottom'), # Add compass
+                size = 2) +
+    tm_scalebar(position = c('right', 'bottom')) + # Add scalebar
+    tm_title('Historical Redlining Neighborhoods in Los Angeles',
+              fontface = 'bold') +
+    tm_layout(bg.color = "lightcyan")
+
+redline_neighborhoods
+```
+
+Census block groups and HOLC grades in Los Angeles:
+
+```{r}
+# Join redlining data and EJ Screen data
+los_angeles_redline <- st_join(los_angeles, redline, join = st_intersects)
+
+```
+
+## Part 2: Legacy of redlining in pedestrian and bike accidents
