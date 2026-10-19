@@ -18,10 +18,12 @@ execute:
 ```{r}
 #| results: hide
 # Load packages
+install.packages("gt")
 library(tidyverse)
 library(sf)
 library(tmap)
 library(here)
+library(gt)
 ```
 
 ## Import data
@@ -33,7 +35,6 @@ ejscreen <- sf::st_read(here::here("data", "ejscreen","EJSCREEN_2023_BG_StatePct
 
 # Filter to Los Angeles County
 los_angeles <- ejscreen |> 
-  dplyr::filter(ST_ABBREV == "CA") |> 
   dplyr::filter(CNTY_NAME %in% c("Los Angeles County"))
 
 ```
@@ -72,11 +73,17 @@ Import bike and pedestrian crash report data:
 ```{r}
 # Read in bike and pedestrian crash report data
 crash <- read_csv(here::here("data", "SWITRS_LA", "crashes.csv"))
+
+# Check for NA values in coordinate columns
+print(paste('There are', sum(is.na(crash$LATITUDE)), 'NA values in the LATITUDE column'))
+print(paste('There are', sum(is.na(crash$LONGITUDE)), 'NA values in the LONGITUDE column'))
+print(paste('There are', sum(is.na(crash$POINT_Y)), 'NA values in the POINT_Y column'))
+print(paste('There are', sum(is.na(crash$POINT_X)), 'NA values in the POINT_X column'))
 ```
 
 Clean latitude and longitude columns and set coordinate reference system to match HOLC Redlining data and EJ Screen data:
 ```{r}
-# Create dataframe of crash columns with latitude and longitude data
+# Create dataframe of crash columns containing latitude and longitude data
 crash_lat_long <- crash[c("LATITUDE", "POINT_Y", "LONGITUDE", "POINT_X")]
 
 # Replace NAs in LATITUDE with POINT_Y values and NAs in LONGITUDE with POINT_X values 
@@ -106,9 +113,8 @@ if((st_crs(redline) == st_crs(crash_clean_coords)) & (st_crs(los_angeles) == st_
 
 Map of historical redlining neighborhoods in Los Angeles:
 ```{r}
-redline_neighborhoods <- tm_shape(los_angeles, bbox = c(-119, 33.65, -117.6, 34.32)) + # Add bounding box to restrict to portion of Los Angeles county with redlining data
+redline_neighborhoods <- tm_basemap("OpenStreetMap") +
   tm_graticules() +
-  tm_polygons(fill = "cornsilk", col = "burlywood4", lwd = 0.5, col_alpha = 0.6) + 
   tm_shape(redline) + # Add historical redlining data
   tm_polygons(fill = "grade", lwd = 0.5,
               fill.scale = tm_scale_categorical(
@@ -119,18 +125,74 @@ redline_neighborhoods <- tm_shape(los_angeles, bbox = c(-119, 33.65, -117.6, 34.
                 size = 2) +
     tm_scalebar(position = c('right', 'bottom')) + # Add scalebar
     tm_title('Historical Redlining Neighborhoods in Los Angeles',
-              fontface = 'bold') +
-    tm_layout(bg.color = "lightcyan")
+              fontface = 'bold')
 
 redline_neighborhoods
 ```
 
 Census block groups and HOLC grades in Los Angeles:
-
 ```{r}
 # Join redlining data and EJ Screen data
 los_angeles_redline <- st_join(los_angeles, redline, join = st_intersects)
-
 ```
+
+```{r}
+# Summarize percentage of census block groups within each HOLC grade
+HOLC_block_groups <- los_angeles_redline |>  
+  st_drop_geometry() |> 
+  mutate(Grade = grade) |> 
+  group_by(Grade) |> 
+  mutate(Grade = replace_na(Grade, "Missing")) |> 
+  summarize(`Block Count` = n()) |> 
+  mutate(`Percentage of Census Blocks` = (`Block Count` / sum(`Block Count`)) * 100)
+
+HOLC_block_groups |> 
+  gt()
+```
+
+Summarize particulate matter 2.5 percentiles and % low income by HOLC grade:
+```{r}
+# Summarize Particulate Matter 2.5 percentiles by HOLC grade
+HOLC_PM25 <- los_angeles_redline |> 
+  st_drop_geometry() |> 
+  group_by(grade) |>  
+  summarize(Mean_PM25_Percentile = mean(P_PM25)) |> 
+  mutate(grade = replace_na(grade, "Missing")) 
+
+# Summarize % low income by HOLC grade
+HOLC_low_income <- los_angeles_redline |> 
+  st_drop_geometry() |> 
+  group_by(grade) |>  
+  summarize(Mean_Pct_Low_Income = (mean(LOWINCPCT) * 100)) |> 
+  mutate(grade = replace_na(grade, "Missing")) 
+```
+
+Visualize particulate matter 2.5 percentiles by HOLC grade:
+```{r}
+ggplot(HOLC_PM25, aes(x = grade, y = Mean_PM25_Percentile, fill = as.factor(grade))) +
+    geom_col() +
+    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "Missing" = "gray")) +
+    labs(
+        title = "Particulate Matter 2.5 Percentiles in Los Angeles by HOLC Grade",
+        x = "HOLC Grade",
+        y = "Mean Particulate 2.5 Percentile",
+        fill = "HOLC Grade"
+    )
+```
+
+Visualize % low income by HOLC grade:
+```{r}
+ggplot(HOLC_low_income, aes(x = grade, y = Mean_Pct_Low_Income, fill = as.factor(grade))) +
+    geom_col() +
+    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "Missing" = "gray")) +
+    labs(
+        title = "Percentage of Low Income Los Angeles Residents by HOLC Grade",
+        x = "HOLC Grade",
+        y = "Mean Percentage of Low Income Residents",
+        fill = "HOLC Grade"
+    )
+```
+
+### Part 1: Reflection
 
 ## Part 2: Legacy of redlining in pedestrian and bike accidents
