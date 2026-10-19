@@ -1,0 +1,103 @@
+---
+title: "EDS 223: Homework Assignment 2"
+subtitle: ""
+author: "Priscilla Pierce"
+date: 10-18-2026
+format: typst
+execute:
+  echo: true
+  warning: false
+  message: false
+  results: hide
+---
+# Title
+
+## Introduction
+
+## Load Packages
+```{r}
+#| results: hide
+# Load packages
+library(tidyverse)
+library(sf)
+library(tmap)
+library(here)
+```
+
+## Import data
+
+Import EJ Screen data:
+```{r}
+# Read in geodatabase of EJScreen data at the Census Block Group level
+ejscreen <- sf::st_read(here::here("data", "ejscreen","EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb"))
+
+# Filter to Los Angeles County
+los_angeles <- ejscreen |> 
+  dplyr::filter(ST_ABBREV == "CA") |> 
+  dplyr::filter(CNTY_NAME %in% c("Los Angeles County"))
+
+```
+
+Import HOLC Redlining data for Los Angeles:
+```{r}
+# Read in HOLC Redlining data for Los Angeles
+redline <- sf::st_read(here::here("data", "mapping-inequality", "mapping-inequality-los-angeles.json"))
+
+# Check CRS of redline against los_angeles
+if(st_crs(redline) == st_crs(los_angeles)) {
+  print('CRS match')
+}else{
+  warning('CRS do not match')
+  print(paste('redline CRS is', st_crs(redline)))
+  print(paste('ej screen CRS is', st_crs(los_angeles)))
+}
+```
+
+Match HOLC Redlining data to the coordinate reference system for EJ Screen data:
+```{r}
+# Change redline CRS to match los_angeles
+redline <- st_transform(redline, 3857)
+
+# Check CRS of redline
+if(st_crs(redline) == st_crs(los_angeles)) {
+  print('CRS match')
+}else{
+  warning('CRS do not match')
+  print(paste('redline CRS is', st_crs(redline)))
+  print(paste('ej screen CRS is', st_crs(los_angeles)))
+}
+```
+
+Import bike and pedestrian crash report data:
+```{r}
+# Read in bike and pedestrian crash report data
+crash <- read_csv(here::here("data", "SWITRS_LA", "crashes.csv"))
+```
+
+Clean latitude and longitude columns and set coordinate reference system to match HOLC Redlining data and EJ Screen data:
+```{r}
+# Create dataframe of crash columns with latitude and longitude data
+crash_lat_long <- crash[c("LATITUDE", "POINT_Y", "LONGITUDE", "POINT_X")]
+
+# Replace NAs in LATITUDE with POINT_Y values and NAs in LONGITUDE with POINT_X values 
+crash_lat_long <- crash_lat_long |> 
+  mutate(combined_lat = (
+    ifelse(is.na(crash_lat_long$LATITUDE), crash_lat_long$POINT_Y, crash_lat_long$LATITUDE))) |> 
+  mutate(combined_long = (
+    ifelse(is.na(crash_lat_long$LONGITUDE), crash_lat_long$POINT_X, crash_lat_long$LONGITUDE)
+  ))
+
+# Add cleaned combined lat and long columns to crash dataframe
+crash_clean_coords <- crash |> 
+  mutate(LONGITUDE = crash_lat_long$combined_long,
+         LATITUDE = crash_lat_long$combined_lat) |> 
+  select(c(-POINT_X, -POINT_Y)) |> # remove old POINT_X and POINT_Y columns
+  drop_na(LATITUDE, LONGITUDE) |> # drop rows with NA latitude or longitude 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 3857) # set CRS to match ejscreen and redline data
+
+# Check that all CRS match
+if((st_crs(redline) == st_crs(crash_clean_coords)) & (st_crs(los_angeles) == st_crs(crash_clean_coords))) {
+  print('CRS match')
+}else{
+  warning('CRS do not match')}
+```
