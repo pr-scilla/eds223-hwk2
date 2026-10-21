@@ -1,16 +1,16 @@
 ---
 title: "EDS 223: Homework Assignment 2"
-subtitle: ""
+subtitle: "Exploring Patterns of Environmental Justice"
 author: "Priscilla Pierce"
 date: 10-18-2026
 format: typst
 execute:
   echo: true
-  warning: false
+  warning: true
   message: false
   results: hide
 ---
-# Title
+# Exploring Patterns of Environmental Justice
 
 ## Introduction
 
@@ -57,7 +57,7 @@ if(st_crs(redline) == st_crs(los_angeles)) {
 Match HOLC Redlining data to the coordinate reference system for EJ Screen data:
 ```{r}
 # Change redline CRS to match los_angeles
-redline <- st_transform(redline, 3857)
+redline <- st_transform(redline, crs = st_crs(los_angeles))
 
 # Check CRS of redline
 if(st_crs(redline) == st_crs(los_angeles)) {
@@ -89,10 +89,10 @@ crash_lat_long <- crash[c("LATITUDE", "POINT_Y", "LONGITUDE", "POINT_X")]
 # Replace NAs in LATITUDE with POINT_Y values and NAs in LONGITUDE with POINT_X values 
 crash_lat_long <- crash_lat_long |> 
   mutate(combined_lat = (
-    ifelse(is.na(crash_lat_long$LATITUDE), crash_lat_long$POINT_Y, crash_lat_long$LATITUDE))) |> 
+    ifelse(is.na(crash_lat_long$LATITUDE), crash_lat_long$POINT_Y, crash_lat_long$LATITUDE))) |> # If value in LATITUDE column is NA, replace with POINT_Y value, otherwise keep LATITUDE value 
   mutate(combined_long = (
     ifelse(is.na(crash_lat_long$LONGITUDE), crash_lat_long$POINT_X, crash_lat_long$LONGITUDE)
-  ))
+  )) # If value in LONGITUDE column is NA, replace with POINT_X value, otherwise keep LONGITUDE value 
 
 # Add cleaned combined lat and long columns to crash dataframe
 crash_clean_coords <- crash |> 
@@ -100,7 +100,8 @@ crash_clean_coords <- crash |>
          LATITUDE = crash_lat_long$combined_lat) |> 
   select(c(-POINT_X, -POINT_Y)) |> # remove old POINT_X and POINT_Y columns
   drop_na(LATITUDE, LONGITUDE) |> # drop rows with NA latitude or longitude 
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 3857) # set CRS to match ejscreen and redline data
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) |> # set CRS to recognize longitude and latitude
+  st_transform(crs = st_crs(los_angeles)) # transform CRS to match ejscreen and redline data
 
 # Check that all CRS match
 if((st_crs(redline) == st_crs(crash_clean_coords)) & (st_crs(los_angeles) == st_crs(crash_clean_coords))) {
@@ -111,7 +112,7 @@ if((st_crs(redline) == st_crs(crash_clean_coords)) & (st_crs(los_angeles) == st_
 
 ## Part 1: Legacy of redlining in current environmental (in)justice
 
-Map of historical redlining neighborhoods in Los Angeles:
+### Map of historical redlining neighborhoods in Los Angeles:
 ```{r}
 redline_neighborhoods <- tm_basemap("OpenStreetMap") +
   tm_graticules() +
@@ -130,19 +131,19 @@ redline_neighborhoods <- tm_basemap("OpenStreetMap") +
 redline_neighborhoods
 ```
 
-Census block groups and HOLC grades in Los Angeles:
+### Census block groups and HOLC grades in Los Angeles:
 ```{r}
 # Join redlining data and EJ Screen data
 los_angeles_redline <- st_join(los_angeles, redline, join = st_intersects)
 ```
 
 ```{r}
-# Summarize percentage of census block groups within each HOLC grade
+# Summarize percentage of census block groups within each HOLC grade for LA County
 HOLC_block_groups <- los_angeles_redline |>  
-  st_drop_geometry() |> 
+  st_drop_geometry() |> # Drop geometries to convert to standard dataframe 
   mutate(Grade = grade) |> 
   group_by(Grade) |> 
-  mutate(Grade = replace_na(Grade, "Missing")) |> 
+  mutate(Grade = replace_na(Grade, "No Grade Assigned")) |> 
   summarize(`Block Count` = n()) |> 
   mutate(`Percentage of Census Blocks` = (`Block Count` / sum(`Block Count`)) * 100)
 
@@ -150,49 +151,131 @@ HOLC_block_groups |>
   gt()
 ```
 
-Summarize particulate matter 2.5 percentiles and % low income by HOLC grade:
+### Summarize particulate matter 2.5 percentiles and % low income by HOLC grade:
 ```{r}
 # Summarize Particulate Matter 2.5 percentiles by HOLC grade
 HOLC_PM25 <- los_angeles_redline |> 
-  st_drop_geometry() |> 
+  st_drop_geometry() |> # Drop geometries to convert to standard dataframe 
   group_by(grade) |>  
   summarize(Mean_PM25_Percentile = mean(P_PM25)) |> 
-  mutate(grade = replace_na(grade, "Missing")) 
+  mutate(grade = replace_na(grade, "No Grade Assigned")) 
 
 # Summarize % low income by HOLC grade
 HOLC_low_income <- los_angeles_redline |> 
-  st_drop_geometry() |> 
+  st_drop_geometry() |> # Drop geometries to convert to standard dataframe 
   group_by(grade) |>  
   summarize(Mean_Pct_Low_Income = (mean(LOWINCPCT) * 100)) |> 
-  mutate(grade = replace_na(grade, "Missing")) 
+  mutate(grade = replace_na(grade, "No Grade Assigned")) 
 ```
 
-Visualize particulate matter 2.5 percentiles by HOLC grade:
+### Visualize particulate matter 2.5 percentiles by HOLC grade:
 ```{r}
 ggplot(HOLC_PM25, aes(x = grade, y = Mean_PM25_Percentile, fill = as.factor(grade))) +
     geom_col() +
-    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "Missing" = "gray")) +
+    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "No Grade Assigned" = "ivory2")) + # Assign appropriate colors to HOLC grades
     labs(
-        title = "Particulate Matter 2.5 Percentiles in Los Angeles by HOLC Grade",
+        title = "Particulate Matter 2.5 Percentiles in Los Angeles \nby HOLC Grade",
         x = "HOLC Grade",
         y = "Mean Particulate 2.5 Percentile",
         fill = "HOLC Grade"
-    )
+    ) +
+    theme(panel.background = element_rect(fill = "azure1"))
 ```
 
-Visualize % low income by HOLC grade:
+### Visualize % low income by HOLC grade:
 ```{r}
 ggplot(HOLC_low_income, aes(x = grade, y = Mean_Pct_Low_Income, fill = as.factor(grade))) +
     geom_col() +
-    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "Missing" = "gray")) +
+    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "No Grade Assigned" = "ivory2")) + # Assign appropriate colors to HOLC grades
     labs(
-        title = "Percentage of Low Income Los Angeles Residents by HOLC Grade",
+        title = "Percentage of Low Income Los Angeles Residents \nby HOLC Grade",
         x = "HOLC Grade",
         y = "Mean Percentage of Low Income Residents",
         fill = "HOLC Grade"
-    )
+    ) +
+    theme(panel.background = element_rect(fill = "azure1"))
 ```
 
 ### Part 1: Reflection
 
 ## Part 2: Legacy of redlining in pedestrian and bike accidents
+
+### Summarize percent of pedestrian and bicylce accidents in Los Angeles county by HOLC grade
+
+
+Create a dataframe of pedestrian and bicycle accidents using crashes data:
+```{r}
+# Filter crashes to include pedestrian and bicycle accidents
+bike_and_ped_accidents <- crash_clean_coords |> 
+  select(c(PEDESTRIAN_ACCIDENT, BICYCLE_ACCIDENT, COUNT_PED_INJURED, COUNT_PED_KILLED, COUNT_BICYCLIST_INJURED, COUNT_BICYCLIST_KILLED)) |> 
+  filter(PEDESTRIAN_ACCIDENT == "Y" | BICYCLE_ACCIDENT == "Y") # Keep rows where pedestrian or bike accidents are marked Y
+
+# Check that CRS matches redlining data
+if(st_crs(bike_and_ped_accidents) == st_crs(redline)) {
+  print('CRS match')
+}else{
+  warning('CRS do not match')
+  print(paste('bike_and_ped_accidents CRS is', st_crs(bike_and_ped_accidents)))
+  print(paste('redline CRS is', st_crs(redline)))
+}
+```
+
+Join pedestrian and bicycle data and redline data:
+```{r}
+# Join bike and pedestrian accident data and redline data
+redline_crashes <- st_join(bike_and_ped_accidents, redline)
+```
+
+Summarize percent of pedestrian and bicycle accidents by HOLC grade:
+```{r}
+# Summarize percentage of pedestrian accidents within each HOLC grade
+HOLC_ped_accidents <- redline_crashes |>  
+  st_drop_geometry() |> # Drop geometries to convert to standard dataframe 
+  select(PEDESTRIAN_ACCIDENT, grade) |> 
+  drop_na(PEDESTRIAN_ACCIDENT) |> # Remove NA pedestrian accident values
+  mutate(Grade = grade) |> 
+  group_by(Grade) |> 
+  summarize(`Pedestrian Crashes Count` = n()) |> 
+  mutate(`Percentage of Pedestrian Crashes` = (`Pedestrian Crashes Count` / sum(`Pedestrian Crashes Count`)) * 100) |> 
+  mutate(Grade = replace_na(Grade, "No Grade Assigned")) 
+
+# Summarize percentage of bike accidents within each HOLC grade
+HOLC_bike_accidents <- redline_crashes |>  
+  st_drop_geometry() |> # Drop geometries to convert to standard dataframe 
+  select(BICYCLE_ACCIDENT, grade) |> 
+  drop_na(BICYCLE_ACCIDENT) |> # Remove NA bicycle accident values
+  mutate(Grade = grade) |> 
+  group_by(Grade) |> 
+  summarize(`Bike Crashes Count` = n()) |> 
+  mutate(`Percentage of Bike Crashes` = (`Bike Crashes Count` / sum(`Bike Crashes Count`)) * 100) |> 
+  mutate(Grade = replace_na(Grade, "No Grade Assigned")) 
+
+# Join bike and pedestrian crash information by HOLC grade
+HOLC_bike_and_ped_accidents <- inner_join(HOLC_bike_accidents, HOLC_ped_accidents, by = "Grade")
+
+# Add column to joined data to show total bike and pedestrian accidents
+HOLC_bike_and_ped_accidents$`Total Crashes` <- HOLC_bike_and_ped_accidents$`Bike Crashes Count` + HOLC_bike_and_ped_accidents$`Pedestrian Crashes Count`
+
+# Add column to joined data to show percentages of total bike and pedestrian accidents
+HOLC_bike_and_ped_accidents$`Percentage of Total Crashes` <- HOLC_bike_and_ped_accidents$`Total Crashes` / sum(HOLC_bike_and_ped_accidents$`Total Crashes`) * 100
+
+HOLC_bike_and_ped_accidents |> 
+  gt()
+```
+
+### Visualize the percentage of pedestrian and bicylce accidents within each HOLC grade
+
+```{r}
+ggplot(HOLC_bike_and_ped_accidents, aes(x = Grade, y = `Percentage of Total Crashes`, fill = as.factor(Grade))) +
+    geom_col() +
+    scale_fill_manual(values = c("A" = 'green3', "B" = 'yellow1', "C" = 'orange1', "D" = 'red2', "No Grade Assigned" = "ivory2")) + # Assign appropriate colors to HOLC grades
+    labs(
+        title = "Percentage of Pedestrian and Bicycle Accidents \nin Los Angeles by HOLC Grade",
+        x = "HOLC Grade",
+        y = "Percentage of Bike and Pedestrian Accidents",
+        fill = "HOLC Grade"
+    ) +
+    theme(panel.background = element_rect(fill = "azure1"))
+```
+
+### Part 2: Reflection
