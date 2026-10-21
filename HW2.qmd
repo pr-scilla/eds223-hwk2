@@ -207,7 +207,7 @@ Create a dataframe of pedestrian and bicycle accidents using crashes data:
 ```{r}
 # Filter crashes to include pedestrian and bicycle accidents
 bike_and_ped_accidents <- crash_clean_coords |> 
-  select(c(PEDESTRIAN_ACCIDENT, BICYCLE_ACCIDENT, COUNT_PED_INJURED, COUNT_PED_KILLED, COUNT_BICYCLIST_INJURED, COUNT_BICYCLIST_KILLED)) |> 
+  select(c(PEDESTRIAN_ACCIDENT, BICYCLE_ACCIDENT)) |> 
   filter(PEDESTRIAN_ACCIDENT == "Y" | BICYCLE_ACCIDENT == "Y") # Keep rows where pedestrian or bike accidents are marked Y
 
 # Check that CRS matches redlining data
