@@ -1,6 +1,6 @@
 # EDS 223 Homework Assignment 2: Exploring Patterns of Environmental Justice
 
-This assignment explores how historical redlining continues to shape health and weath outcomes of modern day residents in Los Angeles county and investigates how redlining has impacted current pedestrian and bicycle safety in the region. 
+This assignment explores how historical redlining continues to shape health and weath outcomes of modern day residents in Los Angeles county and investigates how redlining continues to impact pedestrian and bicycle safety in the region. 
 
 Data from the United States Environmental Protection Agency’s previous [EJScreen: Environmental Justice Screening and Mapping Tool](https://19january2021snapshot.epa.gov/ejscreen/download-ejscreen-data_.html), historical redlining data from the University of Richmond Digital Scholarship Lab's [Mapping Inequality Project](https://dsl.richmond.edu/panorama/redlining/#loc=5/39.1/-94.58), and University of California, Berkley's [Statewide Integrated Traffice Records System](https://tims.berkeley.edu/) data were used to create the map and figures for this assignment. 
 
