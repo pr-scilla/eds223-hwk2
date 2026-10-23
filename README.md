@@ -10,8 +10,6 @@ EDS223-HW2
 │   README.md
 │   HW2.pdf                       # rendered .pdf of quarto document
 │   HW2.qmd                       # quarto document containing assignment code and interpretation
-│   Rmd/Proj files    
-│
 └───.gitignore
      └───data                     # folder containing data files for assignment
          └───ejscreen             # environmental justice screening and mapping data
